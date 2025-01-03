@@ -1,9 +1,8 @@
 # Aura Exchange
-
 ### **Grundlegendes**
 
 - **Wallet**: Beinhaltet die Aura, die du direkt verwenden kannst.
-- **Profile Aura**: Deine langfristige und Hauptsächliche Aura-Bilanz (Assets), die nicht direkt verwendet werden kann.
+- **Profile Aura**: Deine langfristige und hauptsächliche Aura-Bilanz (Assets), die nicht direkt verwendet werden kann.
 
 ---
 
@@ -20,6 +19,9 @@
 
 - **Zeitpunkt**: Jeden Montag um **07:00 Uhr**.
 - **Erhaltene Aura**: **500 Aura**.
+- **Zusatzbonus** für Spieler mit **höchster Profile Aura** am Ende der Woche:
+    - 50% des Wallet-Betrags wird beim Profile hinzuaddiert
+    - 50% des Profile-Betrags wird der Wallet hinzuaddiert
 
 ---
 
@@ -42,26 +44,37 @@
 
 ---
 
-### **Aura looten**
+### **Looting**
 
-- **Befehl**: `!loot @username <amount>`
-- **Regeln**:
-    - Maximal **70% der Wallet-Aura** des Ziels können gelootet werden.
-    - Andere Spieler (mind. 2) müssen ebenfalls an der Loot-Aktion teilnehmen (Bieten) damit ein Loot durchgeführt werden kann.
-- **Payout-Regeln**:
-    - **Highest Bidder**: Erhält den kleinsten Anteil.
-        - Formel: `(highest_bid / participants) * 0.1 * participants`
-    - **Andere Teilnehmer**: Erhalten größere Anteile.
-        - Formel: `(highest_bid / participants) * 0.9`
+### **1. Eröffnung einer Transaktion**
 
-### **Payout-Beispiele**:
+- **Befehl**: `!auction @username`
+- **Dauer**: **3 Minuten** mit einer **dreistelligen ID**
+- **Mindestanzahl**: **3 Teilnehmer** erforderlich
 
-1. **Höchstes Gebot: 1000 | Teilnehmer: 3**
-    - Höchstbietender: **100**
-    - Andere Teilnehmer: **300**
-2. **Höchstes Gebot: 1000 | Teilnehmer: 6**
-    - Höchstbietender: **100**
-    - Andere Teilnehmer: **150**
+### **2. Gebote abgeben**
+
+- **Befehl**: `!loot <key> <amount>`
+- **Optionen**:
+    - **Geheim** per DM
+    - **Öffentlich** im Channel
+- **Abbuchung**: Der Bid wird von der Wallet abgezogen
+
+### **3. Gewinner und Verlierer**
+
+- **Gewinner**: Gebote zwischen Minimum und Maximum
+    - Der höchste Bid wird gerecht zwischen der dazwischenliegenden Spielern aufgeteilt
+- **Verlierer**: Höchstes und niedrigstes Gebot
+    - Zahlen Strafen basierend auf Abstand zum nächsten Nachbarn (Der naheliegendste Bid)
+
+### **4. Sonderfall**
+
+- Wenn alle den gleichen Betrag bieten, dann wird der Bid gerecht aufgeteilt
+
+### **5. Zeitablauf**
+
+- Automatischer Abschluss nach **3 Minuten**
+- Gebote verfallen ohne Verlust bei Abbruch (Refund)
 
 ---
 
@@ -76,8 +89,9 @@
 
 ### **Strategie-Tipps**
 
-1. **Regelmäßige Transfers**: Gib alle 10 Minuten 10 Aura, um Boni beim Wallet Refill zu erhalten.
-2. **Timing bei Loots**: Plane deine Gebote strategisch, um den besten Payout zu sichern.
+1. **Regelmäßige Transfers**: Gib alle 10 Minuten mind. 10 Aura, um Boni beim Wallet Refill zu erhalten.
+2. **Zusammenarbeit**: Verbünde dich mit anderen Spielern um strategisch den höchsten Gewinn zu erzielen
+3. **Deals:** Gehe mit anderen Spielern Deals ein um dein Profile Aura zu erhöhen.
 
 ---
 
