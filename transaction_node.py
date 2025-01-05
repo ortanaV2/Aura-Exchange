@@ -399,6 +399,8 @@ async def on_ready():
     with open("user_base.cac", "wb") as file:
         file.write(encrypted_data)
 
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Aura Economy"))
+    
     print(f"Exchange is Online | Time: {datetime.datetime.now()}")
 
     close_transactions.start()
