@@ -1,0 +1,12 @@
+{
+"daily_standard": 100,
+"daily_multiplier": 12,
+
+"weekly_standard": 500, 
+"weekly_multiplier": 0.5, 
+"weekly_day": 0, 
+"weekly_hour": 7, 
+
+"micro_cooldown": 5, 
+"auction_duration": 3
+}
