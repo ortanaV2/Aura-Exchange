@@ -41,6 +41,22 @@ def save_user_base(user_base: dict) -> None:
         except:
             pass
 
+def load_settings() -> dict:
+    for i in range(3):
+        try:
+            with open("settings.json", "r") as file:
+                return json.load(file)
+        except:
+            return {"daily_standard": 100, "daily_multiplier": 12, "weekly_standard": 500, "weekly_multiplier": 0.5, "weekly_day": 0, "weekly_hour": 7, "micro_cooldown": 5, "auction_duration": 3}
+
+def output_userbase(user_data: dict) -> None:
+    for i in range(3):
+        try:
+            with open("user_base.json", "w") as file:
+                json.dump(user_data, file)
+        except:
+            pass
+
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.MemberNotFound):
@@ -58,6 +74,7 @@ async def on_command_error(ctx, error):
 
 @tasks.loop(seconds=1)
 async def refill_aura():
+    settings = load_settings()
     # refill aura every day at 0:00
     now = datetime.datetime.now()
     if now.hour == 0 and now.minute == 0 and now.second == 0:
@@ -66,23 +83,23 @@ async def refill_aura():
         USER_BASE = load_user_base()
 
         for user_id in USER_BASE:
-            refill_amount = 100 + USER_BASE[user_id][2] * 10
+            refill_amount = int(round(settings["daily_standard"] + USER_BASE[user_id][2] * settings["daily_multiplier"]))
             USER_BASE[user_id][1] += refill_amount
             print(f"Refill Aura | User: {user_id} | Amount: {refill_amount} | Time: {now}")
 
         save_user_base(USER_BASE)
 
     # bonus aura refill every monday at 7:00
-    if now.weekday() == 0 and now.hour == 7 and now.minute == 0 and now.second == 0:
+    if now.weekday() == settings["weekly_day"] and now.hour == settings["weekly_hour"] and now.minute == 0 and now.second == 0:
         USER_BASE = load_user_base()
 
         for user_id in USER_BASE:
             if USER_BASE[user_id][0] == max([user[0] for user in USER_BASE.values()]):
-                bonus_amount = int(round(500 + USER_BASE[user_id][0] * 0.5))
-                profile_bonus = USER_BASE[user_id][1] * 0.5
+                bonus_amount = int(round(settings["weekly_standard"] + USER_BASE[user_id][0] * settings["weekly_multiplier"]))
+                profile_bonus = int(round(USER_BASE[user_id][1] * settings["weekly_multiplier"]))
                 USER_BASE[user_id][0] += profile_bonus
             else:
-                bonus_amount = 500
+                bonus_amount = settings["weekly_standard"]
             USER_BASE[user_id][1] += bonus_amount
             print(f"Refill Aura | User: {user_id} | Amount: {bonus_amount} | Time: {now}")
 
@@ -178,13 +195,31 @@ async def on_message(message):
     if message.author == bot.user:
         return
 
-    allowed_commands = ['!transfer', '!loot', '!balance', '!leaderboard', '!substitute', '!micro', '!auction']
+    allowed_commands = ['!transfer', '!loot', '!balance', '!leaderboard', '!substitute', '!micro', '!auction', '!god', '!offline']
 
     if message.channel.id == TARGET_CHANNEL_ID and not any(message.content.startswith(command) for command in allowed_commands):
         await message.delete()
         print("Invalid command removed in channel {}: {}".format(message.channel.name, message.content))
     else:
         await bot.process_commands(message)
+
+@bot.command()
+async def god(ctx, *, message: str):
+    if ctx.author.id == 582617921050640417:
+        channel = bot.get_channel(TARGET_CHANNEL_ID)
+        await channel.send(f"**Info**: {message}")
+        print(f"Info Message | Message: {message} | Time: {datetime.datetime.now()}")
+
+@bot.command()
+async def offline(ctx):
+    if ctx.author.id == 582617921050640417:
+        USER_BASE = load_user_base()
+        output_userbase(USER_BASE)
+        channel = bot.get_channel(TARGET_CHANNEL_ID)
+        await channel.send(f"**Info**: Userbase saved. Aura-Exchange is going offline for maintenance.")
+        print("Userbase was saved.")
+        print("Aura-Exchange is offline.")
+        quit()
 
 @bot.command()
 async def transfer(ctx, member: discord.Member, amount: int):
@@ -285,7 +320,8 @@ async def auction(ctx, member: discord.Member):
     if any(member.id == OPEN_TRANSACTIONS[auction_id]["member_id"] for auction_id in OPEN_TRANSACTIONS):
         await ctx.send("Auction already in progress.")
     else:
-        expire_time = 3  # minutes 
+        settings = load_settings()
+        expire_time = settings["auction_duration"]  # minutes 
         OPEN_TRANSACTIONS[str(auction_id)] = {"member_id": member.id, "participants": {}, "close_time": datetime.datetime.now() + datetime.timedelta(minutes=expire_time)}
         await ctx.send(f"**Auction**: {ctx.author.mention} started an auction on {member.mention}. The loot key is `{auction_id}`.\n*This transaction will close at {(datetime.datetime.now() + datetime.timedelta(minutes=expire_time)).strftime('%H:%M:%S')}*")
         print(f"Auction | User: {ctx.author.id} | From: {member.id} | Auction ID: {auction_id} | Time: {datetime.datetime.now()}")
@@ -303,7 +339,7 @@ async def balance(ctx, member: discord.Member = None):
 
     save_user_base(USER_BASE)
 
-    await ctx.author.send(f"{member.mention}'s **Balance**:\nProfile (Assets): {USER_BASE[str(member.id)][0]} aura\nWallet: {USER_BASE[str(member.id)][1]} aura\nTotal Networth: {USER_BASE[str(member.id)][0] + USER_BASE[str(member.id)][1]} aura")
+    await ctx.author.send(f"{member.mention}'s **Balance**:\nProfile (Assets): {int(round(USER_BASE[str(member.id)][0]))} aura\nWallet: {int(round(USER_BASE[str(member.id)][1]))} aura\nTotal Networth: {int(round(USER_BASE[str(member.id)][0] + USER_BASE[str(member.id)][1]))} aura")
     if not isinstance(ctx.channel, discord.DMChannel):
         await ctx.message.delete()
     print(f"Balance Request | User: {ctx.author.id} | From: {member.id}")
@@ -318,7 +354,7 @@ async def leaderboard(ctx):
     leaderboard = f"**Leaderboard**:\n"
     for i, (user_id, points) in enumerate(sorted_user_base):
         user = await bot.fetch_user(int(user_id))
-        leaderboard += f"{i+1}. {user.name}: {points[0]} aura\n"
+        leaderboard += f"{f'{i+1}.':<3} {user.name:<15} {int(round(points[0]))} aura\n"
 
     await ctx.author.send(leaderboard)
     if not isinstance(ctx.channel, discord.DMChannel):
@@ -338,7 +374,8 @@ async def micro(ctx, member: discord.Member):
     if str(ctx.author.id) not in COOLDOWN:
         COOLDOWN[str(ctx.author.id)] = datetime.datetime.now()
     else:
-        if (datetime.datetime.now() - COOLDOWN[str(ctx.author.id)]).total_seconds() / 60 < 5:
+        settings = load_settings()
+        if (datetime.datetime.now() - COOLDOWN[str(ctx.author.id)]).total_seconds() / 60 < settings["micro_cooldown"]:
             await ctx.send("Illegal: You are on cooldown for microtransactions.")
             return
         else:
@@ -391,7 +428,12 @@ async def substitute(ctx, amount: int):
 
 @bot.event
 async def on_ready():
-    initial_user_base = {}
+    initial_user_base = {"363613260551028737": [492, 558, 0],  # coltflash
+                         "617392582460440606": [533, 528, 0],   # resident
+                         "1017667141278904321": [25, 700, 0],  # andiamo
+                         "582617921050640417": [366, 28, 0],  # ortana
+                         "778005615402418178": [-25, 700, 0],  # everlys
+                         "744911329508196362": [38, 0, 0]}  # unbeachteter
 
     data = json.dumps(initial_user_base).encode('utf-8')
     encrypted_data = CIPHER_SUITE.encrypt(data)
@@ -400,8 +442,10 @@ async def on_ready():
         file.write(encrypted_data)
 
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Aura Economy"))
-    
+
     print(f"Exchange is Online | Time: {datetime.datetime.now()}")
+    channel = bot.get_channel(TARGET_CHANNEL_ID)
+    await channel.send("Aura-Exchange got updated and is online.")
 
     close_transactions.start()
     refill_aura.start()
