@@ -11,6 +11,7 @@ TARGET_CHANNEL_ID = x
 TRANSACTION_RECORD = {}
 OPEN_TRANSACTIONS = {}
 COOLDOWN = {}
+MINE = {}
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -66,7 +67,7 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.BadArgument):
         await ctx.send("Bad argument. Please provide a valid argument.")
     elif isinstance(error, commands.CommandInvokeError):
-        await ctx.send("Invalid amount. Please enter a valid integer.")
+        await ctx.send("Invalid arguments. Perhaps the feature has a bug.")
     elif isinstance(error, commands.CommandNotFound):
         print("Invalid command removed.")
     else:
@@ -145,7 +146,7 @@ async def close_transactions():
                         sets_amount = len(set(bids))
 
                         if sets_amount == 1:
-                            profit = int(round(bid_amount / len(bids)))
+                            profit = int(round(bid_amount / len(bids))) + bid_amount
                             position = "Average "
                             USER_BASE[str(participant_id)][0] += profit
                         else:    
@@ -189,13 +190,38 @@ async def close_transactions():
 
                 del OPEN_TRANSACTIONS[auction_id]
                 print(f"Auction Closed | ID: {auction_id} | Time: {now}")
+        
+        # Handle mining jobs
+        if 7 <= now.hour < 22:
+            global MINE
+            for user_id in MINE.keys():
+                if now >= MINE[user_id]["time"]:
+                    target_id = str(MINE["target"])
+                    amount = 1 if USER_BASE[str(target_id)][0] * 0.01 < 1 else int(round(USER_BASE[str(target_id)][0] * 0.01))
+                    USER_BASE[target_id][0] -= amount
+                    USER_BASE[user_id][1] += amount
+                    save_user_base(USER_BASE)
+
+                    settings = load_settings()
+                    MINE[user_id]["time"] = datetime.datetime.now() + datetime.timedelta(minutes=settings["micro_cooldown"]*3)
+
+                    user = await bot.fetch_user(user_id)
+                    target = await bot.fetch_user(target_id)
+                    if user is not None and target is not None:
+                        channel = bot.get_channel(TARGET_CHANNEL_ID)
+                        await channel.send(f"**Mining**: {user.id} takes {amount} (1%) of {target.id}'s aura.")
+        else:
+            MINE = {}
+            if now.hour == 22 and now.minute == 0 and now.second == 0:
+                channel = bot.get_channel(TARGET_CHANNEL_ID)
+                await channel.send(f"**Mining**: all mines are offline for today.")
 
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
 
-    allowed_commands = ['!transfer', '!loot', '!balance', '!leaderboard', '!substitute', '!micro', '!auction', '!god', '!offline']
+    allowed_commands = ['!transfer', '!loot', '!balance', '!leaderboard', '!substitute', '!micro', '!auction', '!god', '!offline', '!mine']
 
     if message.channel.id == TARGET_CHANNEL_ID and not any(message.content.startswith(command) for command in allowed_commands):
         await message.delete()
@@ -220,6 +246,43 @@ async def offline(ctx):
         print("Userbase was saved.")
         print("Aura-Exchange is offline.")
         quit()
+
+@bot.command()
+async def mine(ctx, member: discord.Member):
+    if isinstance(ctx.channel, discord.DMChannel):
+        await ctx.send("This command cannot be used in DMs.")
+        return
+    
+    USER_BASE = load_user_base()
+
+    if str(ctx.author.id) not in USER_BASE:
+        USER_BASE[str(ctx.author.id)] = [0, 100, 0]
+    if str(member.id) not in USER_BASE:
+        USER_BASE[str(member.id)] = [0, 100, 0]
+    
+    if len(USER_BASE[str(ctx.author.id)]) == 3:
+        await ctx.send("Illegal: You haven't unlocked this script yet.")
+        return
+    else:
+        if USER_BASE[str(ctx.author.id)][3] < 100:
+            await ctx.send(f"Illegal: You haven't unlocked this script yet.\n*Progress: ({USER_BASE[str(ctx.author.id)][3]}/100)*")
+            return
+        
+        now = datetime.datetime.now()
+        if 7 <= now.hour < 22:
+            global MINE
+            if str(ctx.author.id) in MINE:
+                await ctx.send(f"Illegal: You are already mining.")
+                return
+            else:
+                settings = load_settings()
+                MINE[str(ctx.author.id)] = {"target": str(member.id), 
+                                            "time": datetime.datetime.now() + datetime.timedelta(minutes=settings["micro_cooldown"]*3)}
+                USER_BASE[str(ctx.author.id)][1] -= 10
+                save_user_base(USER_BASE)
+                await ctx.send(f"**Mining Status**: Running\n*Interval: {settings['micro_cooldown']*3} min\tDebited: 10 aura*")
+        else:
+            await ctx.send(f"Illegal: Mining is not possible between 7:00 a.m. and 10:00 p.m.")
 
 @bot.command()
 async def transfer(ctx, member: discord.Member, amount: int):
@@ -370,6 +433,12 @@ async def micro(ctx, member: discord.Member):
     
     if str(ctx.author.id) == str(member.id):
         await ctx.send("Illegal: You cannot take aura from yourself.")
+        return
+    
+    global MINE
+    if str(ctx.author.id) in MINE:
+        await ctx.send("**Mining Status**: Stopped")
+        del MINE[str(ctx.author.id)]
     
     if str(ctx.author.id) not in COOLDOWN:
         COOLDOWN[str(ctx.author.id)] = datetime.datetime.now()
@@ -385,7 +454,6 @@ async def micro(ctx, member: discord.Member):
 
     if str(ctx.author.id) not in USER_BASE:
         USER_BASE[str(ctx.author.id)] = [0, 100, 0]
-
     if str(member.id) not in USER_BASE:
         USER_BASE[str(member.id)] = [0, 100, 0]
 
@@ -393,6 +461,19 @@ async def micro(ctx, member: discord.Member):
         amount = 1 if USER_BASE[str(member.id)][0] * 0.01 < 1 else int(round(USER_BASE[str(member.id)][0] * 0.01))
         USER_BASE[str(member.id)][0] -= amount
         USER_BASE[str(ctx.author.id)][1] += amount 
+
+        if len(USER_BASE[str(ctx.author.id)]) == 3:
+            USER_BASE[str(ctx.author.id)].append(0)
+
+        USER_BASE[str(ctx.author.id)][3] += 1
+        if USER_BASE[str(ctx.author.id)][3] == 100:
+            user = bot.get_user(int(ctx.author.id))
+            if user is None:
+                user = await bot.fetch_user(int(ctx.author.id))
+            if user:
+                await user.send("**Script Unlocked**: You've completed 100 microtransactions and have now become a professional aura miner.\n*Use: !mine @username*")
+            else:
+                print(f"User with ID {ctx.author.id} not found.")
 
     save_user_base(USER_BASE)
 
@@ -428,12 +509,8 @@ async def substitute(ctx, amount: int):
 
 @bot.event
 async def on_ready():
-    initial_user_base = {"363613260551028737": [492, 558, 0],  # coltflash
-                         "617392582460440606": [533, 528, 0],   # resident
-                         "1017667141278904321": [25, 700, 0],  # andiamo
-                         "582617921050640417": [366, 28, 0],  # ortana
-                         "778005615402418178": [-25, 700, 0],  # everlys
-                         "744911329508196362": [38, 0, 0]}  # unbeachteter
+    with open("./user_base.json", "r") as file:
+        initial_user_base = json.load(file)
 
     data = json.dumps(initial_user_base).encode('utf-8')
     encrypted_data = CIPHER_SUITE.encrypt(data)
