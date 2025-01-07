@@ -6,7 +6,6 @@ from cryptography.fernet import Fernet
 import random
 
 TOKEN = x
-
 TARGET_CHANNEL_ID = x
 TRANSACTION_RECORD = {}
 OPEN_TRANSACTIONS = {}
@@ -196,7 +195,8 @@ async def close_transactions():
             global MINE
             for user_id in MINE.keys():
                 if now >= MINE[user_id]["time"]:
-                    target_id = str(MINE["target"])
+                    USER_BASE = load_user_base()
+                    target_id = str(MINE[user_id]["target"])
                     amount = 1 if USER_BASE[str(target_id)][0] * 0.01 < 1 else int(round(USER_BASE[str(target_id)][0] * 0.01))
                     USER_BASE[target_id][0] -= amount
                     USER_BASE[user_id][1] += amount
@@ -209,7 +209,7 @@ async def close_transactions():
                     target = await bot.fetch_user(target_id)
                     if user is not None and target is not None:
                         channel = bot.get_channel(TARGET_CHANNEL_ID)
-                        await channel.send(f"**Mining**: {user.id} takes {amount} (1%) of {target.id}'s aura.")
+                        await channel.send(f"**Mining**: {user.mention} takes {amount} (1%) of {target.mention}'s aura.")
         else:
             MINE = {}
             if now.hour == 22 and now.minute == 0 and now.second == 0:
